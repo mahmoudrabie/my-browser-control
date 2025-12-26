@@ -514,8 +514,8 @@ tell application "System Events"
 end tell
 ```
 
-### ✅ Pattern 5: Input Field Setting (Focus + Select + Keystroke)
-For date/time inputs, use focus + select + keystroke (calendar pickers don't work):
+### ✅ Pattern 5: Input Field Setting (Focus + Select + Delete + Keystroke)
+For date/time inputs, use focus + select + delete + keystroke (calendar pickers don't work):
 ```applescript
 -- Focus and select input via JavaScript
 tell application "Google Chrome"
@@ -528,12 +528,14 @@ tell application "Google Chrome"
         "
     end tell
 end tell
-delay 0.3
+delay 0.2
 
--- Type the value via System Events
+-- Delete selected text then type new value via System Events
 tell application "System Events"
     tell process "Google Chrome"
-        keystroke "12/27/2025"
+        key code 51  -- Backspace to delete selected text
+        delay 0.2
+        keystroke "12/27/2025"  -- Format: MM/DD/YYYY
     end tell
 end tell
 ```

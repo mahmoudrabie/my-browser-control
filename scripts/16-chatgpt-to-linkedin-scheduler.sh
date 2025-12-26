@@ -430,7 +430,8 @@ EOF
     sleep 1.5
     echo "  ✅ Schedule dialog opened"
 
-    # Step 2: Set date (focus input, select all, type new date)
+    # Step 2: Set date (focus input, select, delete, type new date)
+    # PROVEN: Must use select() + backspace + keystroke (not just select + keystroke)
     echo "  [2/5] Setting date to $schedule_date..."
     osascript <<EOF
 tell application "Google Chrome"
@@ -443,10 +444,12 @@ tell application "Google Chrome"
         "
     end tell
 end tell
-delay 0.3
+delay 0.2
 
 tell application "System Events"
     tell process "Google Chrome"
+        key code 51
+        delay 0.2
         keystroke "$schedule_date"
     end tell
 end tell
@@ -454,7 +457,8 @@ EOF
     sleep 0.3
     echo "  ✅ Date set"
 
-    # Step 3: Set time (focus input, select all, type new time)
+    # Step 3: Set time (focus input, select, delete, type new time)
+    # PROVEN: Must use select() + backspace + keystroke (not just select + keystroke)
     echo "  [3/5] Setting time to $schedule_time..."
     osascript <<EOF
 tell application "Google Chrome"
@@ -467,10 +471,12 @@ tell application "Google Chrome"
         "
     end tell
 end tell
-delay 0.3
+delay 0.2
 
 tell application "System Events"
     tell process "Google Chrome"
+        key code 51
+        delay 0.2
         keystroke "$schedule_time"
     end tell
 end tell
