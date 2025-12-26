@@ -293,35 +293,60 @@ on activateTabByHint(hint)
 	end tell
 end activateTabByHint
 
+-- Step 1: Close any existing post dialog to ensure fresh start
+on jsCloseExistingDialog()
+	return "(() => {\n" & ¬
+	"  const editorSelectors = [\n" & ¬
+	"    'div[role=\"textbox\"][contenteditable=\"true\"]',\n" & ¬
+	"    'div.ql-editor[contenteditable=\"true\"]',\n" & ¬
+	"    'div[contenteditable=\"true\"][data-placeholder]'];\n" & ¬
+	"  let editor = editorSelectors.map(s => document.querySelector(s)).find(Boolean);\n" & ¬
+	"  if (editor) {\n" & ¬
+	"    const closeBtn = document.querySelector('button[aria-label=\"Dismiss\"], button[aria-label=\"Close\"], button.artdeco-modal__dismiss');\n" & ¬
+	"    if (closeBtn) { closeBtn.click(); return JSON.stringify({ ok:true, action:'closed' }); }\n" & ¬
+	"  }\n" & ¬
+	"  return JSON.stringify({ ok:true, action:'no-dialog' });\n" & ¬
+	"})()"
+end jsCloseExistingDialog
+
+-- Step 2: Handle discard confirmation if it appears
+on jsClickDiscard()
+	return "(() => {\n" & ¬
+	"  const lower = (s) => (s||'').toLowerCase();\n" & ¬
+	"  const btns = Array.from(document.querySelectorAll('button'));\n" & ¬
+	"  const discardBtn = btns.find(b => lower(b.textContent).includes('discard'));\n" & ¬
+	"  if (discardBtn) { discardBtn.click(); return JSON.stringify({ ok:true, action:'discarded' }); }\n" & ¬
+	"  return JSON.stringify({ ok:true, action:'no-discard-needed' });\n" & ¬
+	"})()"
+end jsClickDiscard
+
+-- Step 3: Open fresh post dialog
+on jsOpenFreshDialog()
+	return "(() => {\n" & ¬
+	"  const lower = (s) => (s||'').toLowerCase();\n" & ¬
+	"  const btns = Array.from(document.querySelectorAll('button, div[role=\"button\"], span[role=\"button\"]'));\n" & ¬
+	"  const startBtn = btns.find(b => lower(b.textContent).includes('start a post'));\n" & ¬
+	"  if (startBtn) { startBtn.click(); return JSON.stringify({ ok:true, action:'opened' }); }\n" & ¬
+	"  return JSON.stringify({ ok:false, reason:'no-start-post-button' });\n" & ¬
+	"})()"
+end jsOpenFreshDialog
+
+-- Step 4: Fill the editor with text
 on jsFillLinkedIn(b64)
 	return "(() => {\n" & ¬
 	"  const bytes = Uint8Array.from(atob('" & b64 & "'), c => c.charCodeAt(0));\n" & ¬
 	"  const text = new TextDecoder('utf-8').decode(bytes);\n" & ¬
 	"\n" & ¬
-	"  const lower = (s) => (s||'').toLowerCase();\n" & ¬
-	"  const byText = (sel, needle) => Array.from(document.querySelectorAll(sel)).find(el => lower(el.textContent).includes(needle));\n" & ¬
-	"\n" & ¬
-	"  // If composer not open, try clicking Start a post\n" & ¬
 	"  const editorSelectors = [\n" & ¬
-	"    'div[role="textbox"][contenteditable="true"]',\n" & ¬
-	"    'div.ql-editor[contenteditable="true"]',\n" & ¬
-	"    'div[contenteditable="true"][data-placeholder]'] ;\n" & ¬
+	"    'div[role=\"textbox\"][contenteditable=\"true\"]',\n" & ¬
+	"    'div.ql-editor[contenteditable=\"true\"]',\n" & ¬
+	"    'div[contenteditable=\"true\"][data-placeholder]'];\n" & ¬
 	"\n" & ¬
 	"  let editor = editorSelectors.map(s => document.querySelector(s)).find(Boolean);\n" & ¬
-	"  if (!editor) {\n" & ¬
-	"    const startBtn = byText('button, div[role="button"], a[role="button"]', 'start a post') || byText('button, div[role="button"], a[role="button"]', 'post');\n" & ¬
-	"    if (startBtn) startBtn.click();\n" & ¬
-	"  }\n" & ¬
-	"\n" & ¬
-	"  editor = editorSelectors.map(s => document.querySelector(s)).find(Boolean);\n" & ¬
 	"  if (!editor) return JSON.stringify({ ok:false, reason:'no-editor-found' });\n" & ¬
 	"\n" & ¬
 	"  editor.focus();\n" & ¬
-	"  // Clear then set text\n" & ¬
-	"  try {\n" & ¬
-	"    document.getSelection()?.removeAllRanges?.();\n" & ¬
-	"  } catch {}\n" & ¬
-	"  editor.innerText = '';\n" & ¬
+	"  editor.innerHTML = '';\n" & ¬
 	"  editor.dispatchEvent(new InputEvent('input', { bubbles:true, data:'' }));\n" & ¬
 	"  editor.innerText = text;\n" & ¬
 	"  editor.dispatchEvent(new InputEvent('input', { bubbles:true, data:text }));\n" & ¬
@@ -339,8 +364,30 @@ if my activateTabByHint(linkedinHint) is false then
 	error "Could not find a Chrome tab matching hint: " & linkedinHint
 end if
 
-delay 1
+delay 0.5
 
+-- Step 1: Close any existing post dialog
+tell application "Google Chrome"
+	set _ to execute front window's active tab javascript (my jsCloseExistingDialog())
+end tell
+
+delay 0.5
+
+-- Step 2: Handle discard confirmation if it appears
+tell application "Google Chrome"
+	set _ to execute front window's active tab javascript (my jsClickDiscard())
+end tell
+
+delay 0.8
+
+-- Step 3: Open a fresh post dialog
+tell application "Google Chrome"
+	set _ to execute front window's active tab javascript (my jsOpenFreshDialog())
+end tell
+
+delay 1.5
+
+-- Step 4: Fill the editor with cleaned text
 tell application "Google Chrome"
 	set resultJson to execute front window's active tab javascript (my jsFillLinkedIn("${text_b64}"))
 end tell
