@@ -231,19 +231,8 @@ EOF
 )
     
     if [ "$textarea_chars" -lt 100 ]; then
-        echo "  ⚠ Keyboard paste may have failed ($textarea_chars chars in textarea)"
-        echo "  >>> HITL: Please manually paste (Cmd+V) into the textarea, then press Enter..."
-        read -r
-        
-        # Re-check
-        textarea_chars=$(osascript <<'EOF'
-tell application "Google Chrome"
-    tell active tab of front window
-        execute javascript "document.querySelector('textarea').value.length"
-    end tell
-end tell
-EOF
-)
+        echo "  ❌ FAILED: Keyboard paste failed ($textarea_chars chars in textarea)"
+        return 1
     fi
     echo "  ✅ VALIDATED: Textarea has $textarea_chars chars"
 
@@ -309,11 +298,8 @@ EOF
         echo -n "$cleaned_text" | pbcopy
         echo "  ✅ VALIDATED: Cleaned text extracted (${#cleaned_text} chars)"
     else
-        echo "  ⚠ Could not extract cleaned text automatically (got ${#cleaned_text} chars)"
-        echo "  >>> HITL FALLBACK: Please click the Copy button on Clean Paste <<<"
-        echo "  >>> Press Enter when done..."
-        read -r
-        validate_clipboard 100 "Clean Paste manual copy"
+        echo "  ❌ FAILED: Could not extract cleaned text (got ${#cleaned_text} chars)"
+        return 1
     fi
 }
 
