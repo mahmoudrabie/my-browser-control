@@ -1,30 +1,84 @@
-# Browser MCP Skills
+# Browser Automation Skills
 
-This directory contains reusable skill patterns for Browser MCP automation.
+This directory contains reusable skill patterns for browser automation using AppleScript and System Events on macOS.
+
+## ⚠️ Critical Pattern: Window Inspection First
+
+**Every automation workflow MUST start with Chrome window/tab inspection:**
+
+```bash
+inspect_chrome_window() {
+    osascript <<'APPLESCRIPT'
+tell application "Google Chrome"
+    if (count of windows) = 0 then return "error:No Chrome windows open"
+    set windowCount to count of windows
+    set win to front window
+    set tabCount to count of tabs of win
+    set activeIdx to active tab index of win
+    return "ok:" & windowCount & ":" & tabCount & ":" & activeIdx
+end tell
+APPLESCRIPT
+}
+```
 
 ## Skills Index
 
 | Skill | Description | File | Status |
 |-------|-------------|------|--------|
-| Navigation | Page navigation, URL handling, waiting | [01-navigation.md](01-navigation.md) | ✅ |
-| Interaction | Clicking, typing, form filling | [02-interaction.md](02-interaction.md) | ✅ |
-| Page Analysis | Snapshots, element discovery | [03-page-analysis.md](03-page-analysis.md) | ✅ |
-| Workflows | Multi-step automation patterns | [04-workflows.md](04-workflows.md) | ✅ |
 | Chrome Debug Mode | Chrome debugging setup | [05-chrome-debug-mode.md](05-chrome-debug-mode.md) | ✅ |
-| Browser MCP Comparison | Tool comparison | [06-browser-mcp-comparison.md](06-browser-mcp-comparison.md) | ✅ |
 | AppleScript Automation | Chrome + AppleScript | [07-applescript-automation.md](07-applescript-automation.md) | ✅ |
-| Chrome Tab Navigator | Tab navigation by URL | [08-chrome-tab-navigator.md](08-chrome-tab-navigator.md) | ✅ |
+| Chrome Tab Navigator | Window inspection, tab detection | [08-chrome-tab-navigator.md](08-chrome-tab-navigator.md) | ✅ |
 | Google Sheets Updater | Sheet automation | [09-google-sheets-updater.md](09-google-sheets-updater.md) | ✅ |
-| LinkedIn Post Scheduler | Full LinkedIn workflow | [10-linkedin-post-scheduler.md](10-linkedin-post-scheduler.md) | ✅ |
+| LinkedIn Post Scheduler | 19-step LinkedIn workflow | [10-linkedin-post-scheduler.md](10-linkedin-post-scheduler.md) | ✅ |
+| LinkedIn Posts to Sheet | Activity extraction | [11-linkedin-posts-to-sheet.md](11-linkedin-posts-to-sheet.md) | ✅ |
 
 ---
 
 ## 🔬 Proven Patterns (Tested Dec 2025)
 
-### ✅ Extract Text from ChatGPT (Works!)
-**Problem**: Clicking Copy button via JS doesn't work (browser clipboard security)  
-**Solution**: Extract text directly from DOM → pipe to `pbcopy`
+### ✅ Window Inspection (Mandatory First Step)
+```bash
+# Returns: ok:windowCount:tabCount:activeIdx or error:message
+osascript -e '
+tell application "Google Chrome"
+    if (count of windows) = 0 then return "error:No Chrome windows"
+    set win to front window
+    return "ok:" & (count of windows) & ":" & (count of tabs of win) & ":" & (active tab index of win)
+end tell
+'
+```
 
+### ✅ Dynamic Tab Detection by URL Pattern
+```bash
+osascript -e '
+tell application "Google Chrome"
+    set win to front window
+    repeat with i from 1 to count of tabs of win
+        if URL of tab i of win contains "linkedin.com/in/" and URL of tab i of win contains "activity" then
+            return i
+        end if
+    end repeat
+    return 0
+end tell
+'
+```
+
+### ✅ Clipboard Content Extraction (Works on LinkedIn!)
+**Problem**: JavaScript via AppleScript cannot access LinkedIn's dynamic content  
+**Solution**: Use Cmd+A, Cmd+C to copy, then parse clipboard with Python
+
+```bash
+# Copy page content to clipboard
+osascript -e 'tell application "System Events" to keystroke "a" using command down'
+sleep 0.5
+osascript -e 'tell application "System Events" to keystroke "c" using command down'
+sleep 0.5
+
+# Parse with Python
+pbpaste | python3 -c "import sys; print(sys.stdin.read()[:500])"
+```
+
+### ✅ Extract Text from ChatGPT DOM
 ```bash
 osascript <<'EOF' | pbcopy
 tell application "Google Chrome"
@@ -43,76 +97,28 @@ end tell
 EOF
 ```
 
-### ✅ Navigate to Tab by URL Pattern (Works!)
+### ✅ Google Sheets Cell Update
 ```bash
-osascript <<EOF
-tell application "Google Chrome"
-    repeat with w in windows
-        set tabIndex to 1
-        repeat with t in tabs of w
-            if URL of t contains "YOUR_PATTERN" then
-                set active tab index of w to tabIndex
-                set index of w to 1
-                activate
-                return "found"
-            end if
-            set tabIndex to tabIndex + 1
-        end repeat
-    end repeat
-end tell
-EOF
+# Navigate to cell (Ctrl+G)
+osascript -e 'tell application "System Events" to keystroke "g" using control down'
+sleep 0.5
+osascript -e 'tell application "System Events" to keystroke "B275"'
+osascript -e 'tell application "System Events" to key code 36'  # Enter
+sleep 0.5
+
+# Clear and paste (Escape + Delete + Cmd+V)
+osascript -e 'tell application "System Events" to key code 53'  # Escape
+osascript -e 'tell application "System Events" to key code 51'  # Delete
+echo "New Value" | pbcopy
+osascript -e 'tell application "System Events" to keystroke "v" using command down'
 ```
-
-### ✅ Paste to Focused Element (Works!)
-**CRITICAL**: Must activate Chrome AND focus the target element before pasting:
-```bash
-osascript <<'EOF'
-# Step 1: Activate Chrome
-tell application "Google Chrome"
-    activate
-    delay 0.3
-    # Step 2: Focus element via JavaScript
-    tell active tab of front window
-        execute javascript "document.querySelector('.ql-editor').focus()"
-    end tell
-end tell
-delay 0.3
-
-# Step 3: Paste using process-specific keystroke
-tell application "System Events"
-    tell process "Google Chrome"
-        keystroke "v" using command down
-    end tell
-end tell
-EOF
-```
-
-### ❌ Click Copy Button via JS (Doesn't Work)
-Browser security blocks clipboard write from JavaScript triggered via AppleScript.
-
-### ❌ Paste Without Focus (Doesn't Work)
-If Chrome isn't activated or target element isn't focused, paste goes to wrong window (e.g., Terminal).
 
 ---
 
-## Key Concepts
+## Key Principles
 
-### Connection Model
-- Browser MCP connects to **one tab at a time** via the Chrome extension
-- Use the extension popup "Connect" button to attach to the active tab
-- Tool calls control only the connected tab
-
-### Core Tools
-- `browser_navigate` - Go to a URL
-- `browser_snapshot` - Get accessibility tree of current page
-- `browser_click` - Click an element by reference
-- `browser_type` - Type text into an element
-- `browser_wait` - Wait for a specified time
-- `browser_screenshot` - Capture visual screenshot
-
-### Best Practices
-1. Always take a snapshot before interacting with elements
-2. Use element `ref` values from snapshots for reliable targeting
-3. Add waits after navigation for dynamic content to load
-4. Prefer direct URL navigation over clicking when possible
-5. **Extract DOM text + pbcopy** instead of clicking Copy buttons
+1. **No New Windows**: Work with existing Chrome window only
+2. **Dynamic Detection**: Find tabs by URL/title patterns, not hardcoded numbers
+3. **Clipboard Method**: Use Cmd+A, Cmd+C for content that JS can't access
+4. **Python Parsing**: Parse clipboard content with Python for structured data
+5. **Validation**: Verify each step before proceeding to next

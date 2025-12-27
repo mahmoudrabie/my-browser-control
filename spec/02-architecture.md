@@ -2,60 +2,77 @@
 
 ## Components
 
-- **Chrome** (dedicated profile) for isolated automation.
-- **Browser MCP extension** (id bjfgambnhccakkhmkepdoekmckoijdlc) in that profile.
-- **MCP Server** (`@browsermcp/mcp@latest`) running via npx.
-- **MCP Client** (VS Code Copilot, Claude Desktop, Cursor, etc.) that invokes tools.
-- Optional macOS automation (Accessibility/Automation) for non-browser control.
+- **Google Chrome** - Single window with all required tabs open
+- **AppleScript** - Chrome control, tab navigation, window inspection
+- **System Events** - Keyboard shortcuts, UI automation
+- **Bash Scripts** - Workflow orchestration
+- **Python** - Content parsing, normalization, data transformation
 
-## Connection Model
+## Control Flow
 
 ```
-┌─────────────────┐     MCP Protocol      ┌──────────────────┐
-│   MCP Client    │ ◄────────────────────► │   MCP Server     │
-│ (VS Code/Claude)│                       │ (@browsermcp/mcp)│
-└─────────────────┘                       └────────┬─────────┘
-                                                   │
-                                          Chrome Extension
-                                          Connection
-                                                   │
-                                                   ▼
-                                          ┌──────────────────┐
-                                          │  Connected Tab   │
-                                          │  (one at a time) │
-                                          └──────────────────┘
+┌─────────────────────────────────────────────────────────────┐
+│                    Bash Script (Orchestrator)               │
+│                                                             │
+│  ┌─────────────────┐   ┌─────────────────┐                 │
+│  │ Step 0: Inspect │   │ Step N: Execute │                 │
+│  │ Chrome Window   │ → │ Automation      │                 │
+│  └────────┬────────┘   └────────┬────────┘                 │
+│           │                     │                          │
+│           ▼                     ▼                          │
+│  ┌─────────────────┐   ┌─────────────────┐                 │
+│  │   AppleScript   │   │  System Events  │                 │
+│  │ (osascript)     │   │ (keyboard/UI)   │                 │
+│  └────────┬────────┘   └────────┬────────┘                 │
+│           │                     │                          │
+│           └──────────┬──────────┘                          │
+│                      ▼                                     │
+│              ┌──────────────┐                              │
+│              │ Google Chrome│                              │
+│              │ (1 window,   │                              │
+│              │  N tabs)     │                              │
+│              └──────────────┘                              │
+└─────────────────────────────────────────────────────────────┘
 ```
+
+## Tab Structure (Typical Setup)
+
+| Tab | Content | URL Pattern |
+|-----|---------|-------------|
+| 1-5 | ChatGPT GPTs | `chatgpt.com/g/` |
+| 6 | Clean Paste | `cleanpaste.site` |
+| 7 | LinkedIn Feed | `linkedin.com/feed` |
+| 8 | LinkedIn Activity | `linkedin.com/in/*/recent-activity` |
+| 9 | Google Sheet | `docs.google.com/spreadsheets` |
+
+**Note**: Tab numbers are detected dynamically, not hardcoded.
 
 ## Key Constraints
 
-1. **Single Tab Control**: Browser MCP connects to ONE tab at a time
-   - Click "Connect" in extension popup to attach to active tab
-   - All tool calls affect only the connected tab
+1. **Single Window**: All automation works within one Chrome window
+2. **No New Windows**: Scripts never create new browser windows
+3. **Dynamic Detection**: Tab positions detected by URL/title patterns
+4. **Clipboard Method**: Use Cmd+A/Cmd+C for content (JavaScript blocked)
+5. **Window Inspection First**: Every workflow starts with `init_chrome_window()`
 
-2. **Accessibility Tree**: Snapshots return structured YAML
-   - Elements have `ref` values for targeting
-   - Refs are valid only until page changes
+## Data Flow Example: LinkedIn Posts to Sheet
 
-3. **No Tab Enumeration**: Cannot list or switch between tabs programmatically
-   - Must manually connect to desired tab via extension popup
-
-## VS Code MCP Configuration
-
-```json
-{
-  "mcp": {
-    "servers": {
-      "browsermcp": {
-        "command": "npx",
-        "args": ["@browsermcp/mcp@latest"]
-      }
-    }
-  }
-}
 ```
-
-## Notes
-
-- The extension controls the browser tab. For OS-level control, you must grant macOS permissions and use additional automation tooling.
-- Prefer direct URL navigation for SPAs to avoid stale element references.
-- Always snapshot before interacting with elements.
+LinkedIn Activity Tab
+        │
+        │ Cmd+A, Cmd+C
+        ▼
+    Clipboard (pbpaste)
+        │
+        │ Python parsing
+        ▼
+    Posts JSON [{title, date, discipline, column}]
+        │
+        │ For each post
+        ▼
+    Google Sheet Tab
+        │
+        │ Ctrl+G → Cell, Escape, Delete, Cmd+V
+        ▼
+    Updated Sheet
+```

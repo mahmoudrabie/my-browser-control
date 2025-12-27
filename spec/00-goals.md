@@ -1,28 +1,37 @@
 # Goals
 
-- Use Browser MCP (`@browsermcp/mcp` / extension id bjfgambnhccakkhmkepdoekmckoijdlc) with a dedicated Chrome profile on macOS.
-- Provide repeatable local scripts to install/open/configure and verify connectivity.
-- Provide a clear runbook for connecting an MCP-capable client (VS Code, Claude Desktop, etc.).
-- Keep the setup local and explicit about macOS permissions.
-- Document skills and patterns for effective browser automation.
+- Automate browser interactions using AppleScript and System Events on macOS.
+- Use existing Chrome windows and tabs - no new windows created during automation.
+- Provide repeatable local scripts for LinkedIn post scheduling, content extraction, and Google Sheet updates.
+- Document skills and patterns for effective browser automation using proven clipboard-based methods.
+- Always start automation workflows by inspecting opened Chrome window tabs.
 
 ## Non-goals
 
-- Remote control over the network or bypassing macOS security.
-- Automating tasks outside of the browser without explicit OS permissions.
-- Multi-tab or multi-window control (Browser MCP controls one connected tab at a time).
+- Remote control over the network.
+- Bypassing macOS security.
+- Opening new browser windows during automation workflows.
+- Using MCP for browser control (replaced by AppleScript/System Events approach).
 
 ## Assumptions
 
-- Google Chrome is installed.
-- You will install the extension manually from the Chrome Web Store.
-- The extension connects via the Chrome extension popup "Connect" button.
-- MCP client (VS Code Copilot, Claude Desktop, etc.) is configured to use the browsermcp server.
+- Google Chrome is installed and running with required tabs open.
+- macOS Accessibility permissions granted to Terminal/VS Code for System Events.
+- Required tabs already open: LinkedIn, Google Sheets, ChatGPT, Clean Paste (as needed).
+- Single Chrome window with all required tabs.
 
 ## Key Learnings
 
-- Browser MCP works by connecting to a **single tab** at a time
-- Use `browser_snapshot` to get accessibility tree with element refs
-- Use element `ref` values for reliable click/type targeting
-- Prefer direct URL navigation over clicking for SPAs (avoids stale refs)
-- Always wait after navigation before taking snapshots
+- **Window Inspection First**: Always inspect opened Chrome window tabs before automation
+- **Clipboard Method**: Use Cmd+A, Cmd+C for content extraction (JavaScript blocked on LinkedIn)
+- **Dynamic Tab Detection**: Detect tab numbers by URL/title patterns, not hardcoded values
+- **System Events**: Use AppleScript System Events for keyboard shortcuts and UI interactions
+- **No New Windows**: Work with existing Chrome window, never create new windows
+
+## Proven Automation Patterns
+
+1. **inspect_chrome_window()** - Verify window exists, get tab count
+2. **detect_required_tabs()** - Find tabs by URL pattern dynamically
+3. **Clipboard extraction** - Cmd+A, Cmd+C for page content
+4. **Python parsing** - Parse clipboard for structured data
+5. **Google Sheets update** - Ctrl+G navigation, Escape+Delete clear, Cmd+V paste
