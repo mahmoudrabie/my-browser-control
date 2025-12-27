@@ -1,7 +1,14 @@
 #!/bin/bash
 # ChatGPT to LinkedIn Post Scheduler
 #
+# CRITICAL: This script starts by inspecting the opened Chrome window tabs.
+# No new Chrome windows are opened - works with existing tabs only.
+#
 # Complete 19-Step Workflow (All Validated Dec 2025):
+#
+# Step 0: Inspect Chrome Window (MANDATORY FIRST STEP)
+#   - Verify single Chrome window exists
+#   - Detect and validate all required tabs (ChatGPT, CleanPaste, LinkedIn)
 #
 # ChatGPT Phase:
 #   1. Clear clipboard
@@ -62,6 +69,134 @@ declare -A SHEET_COLUMNS=(
     ["OpenSourceAIProjects"]="E"
     ["OpenSourceLLMs"]="F"
 )
+
+# ============================================================
+# STEP 0: Chrome Window/Tab Inspection (MANDATORY FIRST STEP)
+# ============================================================
+
+# Verify Chrome has window open and get tab counts
+inspect_chrome_window() {
+    osascript <<'APPLESCRIPT'
+tell application "Google Chrome"
+    if (count of windows) = 0 then return "error:No Chrome windows open"
+    
+    set windowCount to count of windows
+    set win to front window
+    set tabCount to count of tabs of win
+    set activeIdx to active tab index of win
+    
+    return "ok:" & windowCount & ":" & tabCount & ":" & activeIdx
+end tell
+APPLESCRIPT
+}
+
+# Detect all required tabs for the 19-step workflow
+detect_required_tabs() {
+    osascript <<'APPLESCRIPT'
+tell application "Google Chrome"
+    if (count of windows) = 0 then return "error:No Chrome windows open"
+    
+    set win to front window
+    set chatgptFound to false
+    set cleanpasteFound to false
+    set linkedinFound to false
+    set sheetFound to false
+    
+    repeat with i from 1 to count of tabs of win
+        set t to tab i of win
+        set tabURL to URL of t
+        set tabTitle to title of t
+        
+        -- Check for ChatGPT tabs (any GPT)
+        if tabURL contains "chatgpt.com" then
+            set chatgptFound to true
+        end if
+        
+        -- Check for Clean Paste tab
+        if tabURL contains "cleanpaste" then
+            set cleanpasteFound to true
+        end if
+        
+        -- Check for LinkedIn feed/post tab
+        if tabURL contains "linkedin.com" then
+            set linkedinFound to true
+        end if
+        
+        -- Check for Google Sheet tab
+        if tabURL contains "docs.google.com/spreadsheets" then
+            set sheetFound to true
+        end if
+    end repeat
+    
+    -- Build missing list
+    set missingList to {}
+    if not chatgptFound then set end of missingList to "ChatGPT"
+    if not cleanpasteFound then set end of missingList to "CleanPaste"
+    if not linkedinFound then set end of missingList to "LinkedIn"
+    if not sheetFound then set end of missingList to "GoogleSheet"
+    
+    if (count of missingList) = 0 then
+        return "ok:all tabs found"
+    else
+        set AppleScript's text item delimiters to ","
+        set missingStr to missingList as string
+        set AppleScript's text item delimiters to ""
+        return "missing:" & missingStr
+    end if
+end tell
+APPLESCRIPT
+}
+
+# Initialize and validate Chrome window and tabs
+init_chrome_window() {
+    echo "Step 0: Inspecting opened Chrome window..."
+    echo ""
+    
+    # First verify Chrome window exists
+    local window_info
+    window_info=$(inspect_chrome_window)
+    
+    if [[ "$window_info" == error:* ]]; then
+        echo "  ❌ ERROR: ${window_info#error:}"
+        echo "  Please open Chrome with required tabs before running this script."
+        exit 1
+    fi
+    
+    # Parse window info: ok:windowCount:tabCount:activeIdx
+    IFS=':' read -r status windowCount tabCount activeIdx <<< "$window_info"
+    echo "  ✅ Chrome windows: $windowCount"
+    echo "  ✅ Front window tabs: $tabCount"
+    echo "  ✅ Active tab: #$activeIdx"
+    echo ""
+    
+    # Detect required tabs
+    echo "  Checking for required tabs..."
+    local tab_check
+    tab_check=$(detect_required_tabs)
+    
+    if [[ "$tab_check" == missing:* ]]; then
+        local missing="${tab_check#missing:}"
+        echo "  ❌ ERROR: Missing tabs: $missing"
+        echo ""
+        echo "  Required tabs:"
+        echo "    - ChatGPT (with GPT conversations)"
+        echo "    - Clean Paste (cleanpaste.site)"
+        echo "    - LinkedIn (feed or profile)"
+        echo "    - Google Sheet (My Selected Sources)"
+        echo ""
+        echo "  Please open all required tabs and try again."
+        exit 1
+    fi
+    
+    echo "  ✅ All required tabs found:"
+    echo "    - ChatGPT ✓"
+    echo "    - CleanPaste ✓"
+    echo "    - LinkedIn ✓"
+    echo "    - GoogleSheet ✓"
+    echo ""
+}
+
+# ============================================================
 
 # Function: Navigate to Chrome tab by URL pattern
 # Returns: "found" or "not found"
@@ -571,10 +706,14 @@ main() {
     local sheet_row=275  # Row for 2025-12-28 (273 + 2)
 
     echo "==========================================="
-    echo "LinkedIn Post Scheduler"
+    echo "LinkedIn Post Scheduler - 19-Step Workflow"
     echo "==========================================="
     echo "Schedule date: $today_date"
     echo ""
+    
+    # Step 0: Inspect Chrome window and validate tabs (MANDATORY FIRST STEP)
+    init_chrome_window
+    
     echo "Schedule times:"
     echo "  SOTA: 1:00 PM"
     echo "  AgenticAI: 2:00 PM"

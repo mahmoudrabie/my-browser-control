@@ -3,10 +3,76 @@
 ## Description
 Automate creating and scheduling LinkedIn posts from content in ChatGPT tabs.
 
+## ⚠️ CRITICAL: Start with Window/Tab Inspection (MANDATORY FIRST STEP)
+
+**ALWAYS start by inspecting the opened Chrome window tabs** before any automation:
+1. Verify Chrome has exactly 1 window open (no new windows will be created)
+2. Detect and validate all required tabs exist (ChatGPT, CleanPaste, LinkedIn, GoogleSheet)
+3. Only proceed if all required tabs are found
+
+### Step 0: Inspect Chrome Window
+```bash
+# Verify Chrome window exists
+inspect_chrome_window() {
+    osascript <<'APPLESCRIPT'
+tell application "Google Chrome"
+    if (count of windows) = 0 then return "error:No Chrome windows open"
+    
+    set windowCount to count of windows
+    set win to front window
+    set tabCount to count of tabs of win
+    set activeIdx to active tab index of win
+    
+    return "ok:" & windowCount & ":" & tabCount & ":" & activeIdx
+end tell
+APPLESCRIPT
+}
+
+# Detect all required tabs
+detect_required_tabs() {
+    osascript <<'APPLESCRIPT'
+tell application "Google Chrome"
+    set win to front window
+    set chatgptFound to false
+    set cleanpasteFound to false
+    set linkedinFound to false
+    set sheetFound to false
+    
+    repeat with i from 1 to count of tabs of win
+        set t to tab i of win
+        set tabURL to URL of t
+        set tabTitle to title of t
+        
+        if tabURL contains "chatgpt.com" then set chatgptFound to true
+        if tabURL contains "cleanpaste" then set cleanpasteFound to true
+        if tabURL contains "linkedin.com" then set linkedinFound to true
+        if tabURL contains "docs.google.com/spreadsheets" then set sheetFound to true
+    end repeat
+    
+    -- Return missing tabs or "ok"
+    if chatgptFound and cleanpasteFound and linkedinFound and sheetFound then
+        return "ok:all tabs found"
+    else
+        set missing to ""
+        if not chatgptFound then set missing to missing & "ChatGPT,"
+        if not cleanpasteFound then set missing to missing & "CleanPaste,"
+        if not linkedinFound then set missing to missing & "LinkedIn,"
+        if not sheetFound then set missing to missing & "GoogleSheet,"
+        return "missing:" & text 1 thru -2 of missing
+    end if
+end tell
+APPLESCRIPT
+}
+```
+
 ## Prerequisites
-- Google Chrome with LinkedIn logged in
-- ChatGPT tabs with posts ready to copy
-- Clean Paste tab open (https://cleanpaste.site)
+- Google Chrome with all required tabs open:
+  - ChatGPT tabs with posts ready to copy
+  - Clean Paste tab (https://cleanpaste.site)
+  - LinkedIn logged in
+  - Google Sheet (My Selected Sources)
+- **Tab detection is automatic** - no hardcoded tab numbers needed
+- **No new Chrome windows will be opened**
 
 ## Validation Strategy
 **Every step must be validated before proceeding to the next step.**
