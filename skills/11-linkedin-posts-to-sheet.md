@@ -3,21 +3,109 @@
 ## Description
 Extract post titles from LinkedIn activity page and update Google Sheet based on discipline hashtags and dates.
 
+## ⚠️ CRITICAL: Start with Window/Tab Inspection
+
+**ALWAYS start by inspecting the opened Chrome window tabs** before any automation:
+1. Verify Chrome has exactly 1 window open (no new windows will be created)
+2. Dynamically detect tab numbers for LinkedIn Activity and Google Sheet
+3. Only proceed if required tabs are found
+
 ## ⚠️ CRITICAL: Use Clipboard Method (Not JavaScript)
 
 **JavaScript via AppleScript CANNOT access LinkedIn's dynamically loaded post content.** LinkedIn blocks access to DOM content through the `execute javascript` method.
 
 **Proven working method:** Use `Cmd+A, Cmd+C` (Select All, Copy) to capture page content to clipboard, then parse with Python.
 
+## Step 0: Inspect Opened Chrome Window Tabs (MANDATORY FIRST STEP)
+
+### Verify Single Window & Count Tabs
+```applescript
+tell application "Google Chrome"
+    if (count of windows) = 0 then error "No Chrome windows open"
+    set windowCount to count of windows
+    set win to front window
+    set tabCount to count of tabs of win
+    return "Windows: " & windowCount & ", Tabs: " & tabCount
+end tell
+```
+
+### Dynamically Find Required Tabs by URL Pattern
+```applescript
+tell application "Google Chrome"
+    set win to front window
+    set activityTab to 0
+    set sheetTab to 0
+    
+    repeat with i from 1 to count of tabs of win
+        set t to tab i of win
+        set tabURL to URL of t
+        set tabTitle to title of t
+        
+        -- Find LinkedIn Activity tab
+        if tabURL contains "mahmoudrabie2004/recent-activity" then
+            set activityTab to i
+        end if
+        
+        -- Find Google Sheet tab by title
+        if tabURL contains "docs.google.com/spreadsheets" then
+            if tabTitle contains "Selected Sources" or tabTitle contains "Weekly posts" then
+                set sheetTab to i
+            end if
+        end if
+    end repeat
+    
+    return "Activity Tab: " & activityTab & ", Sheet Tab: " & sheetTab
+end tell
+```
+
+### Bash Function for Tab Detection
+```bash
+# Detect tabs dynamically - returns "activity_tab:sheet_tab" or "error:message"
+detect_required_tabs() {
+    osascript <<'APPLESCRIPT'
+tell application "Google Chrome"
+    if (count of windows) = 0 then return "error:No Chrome windows open"
+    
+    set win to front window
+    set activityTab to 0
+    set sheetTab to 0
+    
+    repeat with i from 1 to count of tabs of win
+        set t to tab i of win
+        set tabURL to URL of t
+        set tabTitle to title of t
+        
+        if tabURL contains "mahmoudrabie2004/recent-activity" then
+            set activityTab to i
+        end if
+        
+        if tabURL contains "docs.google.com/spreadsheets" then
+            if tabTitle contains "Selected Sources" or tabTitle contains "Weekly posts" then
+                set sheetTab to i
+            end if
+        end if
+    end repeat
+    
+    if activityTab = 0 then return "error:LinkedIn Activity tab not found"
+    if sheetTab = 0 then return "error:Google Sheet tab not found"
+    
+    return (activityTab as string) & ":" & (sheetTab as string)
+end tell
+APPLESCRIPT
+}
+```
+
 ## Prerequisites
 - Google Chrome with:
-  - LinkedIn activity page open (Tab 7): `linkedin.com/in/mahmoudrabie2004/recent-activity/all/`
-  - Google Sheet open (Tab 11): `My Selected Sources for Weekly posts`
+  - LinkedIn activity page open: `linkedin.com/in/mahmoudrabie2004/recent-activity/all/`
+  - Google Sheet open: `My Selected Sources for Weekly posts`
+  - **Tab numbers are detected dynamically** (no hardcoded values needed)
 
-## Proven Configuration
+## Configuration (with Dynamic Tab Detection)
 ```bash
-LINKEDIN_ACTIVITY_TAB=7
-GOOGLE_SHEET_TAB=11
+# Tabs are auto-detected, but can be overridden via environment variables
+LINKEDIN_ACTIVITY_TAB="${LINKEDIN_ACTIVITY_TAB:-auto}"
+GOOGLE_SHEET_TAB="${GOOGLE_SHEET_TAB:-auto}"
 SHEET_START_DATE="2025-12-08"  # Row 237
 SHEET_START_ROW=237
 ROWS_PER_DATE=2  # Each date takes 2 rows in the sheet

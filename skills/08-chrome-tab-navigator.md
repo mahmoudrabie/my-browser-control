@@ -1,7 +1,41 @@
 # Chrome Tab Navigator Skill
 
 ## Description
-Navigate between Chrome tabs by URL pattern or title.
+Navigate between Chrome tabs by URL pattern or title. **Always start by inspecting opened window tabs.**
+
+## ⚠️ CRITICAL: Start with Window Inspection (MANDATORY FIRST STEP)
+
+Before any automation, verify Chrome window state and detect tabs dynamically:
+
+### Verify Chrome Window Exists
+```applescript
+tell application "Google Chrome"
+    if (count of windows) = 0 then error "No Chrome windows open"
+    set windowCount to count of windows
+    set win to front window
+    set tabCount to count of tabs of win
+    set activeIdx to active tab index of win
+    return "Windows: " & windowCount & ", Tabs: " & tabCount & ", Active: Tab " & activeIdx
+end tell
+```
+
+### Bash Function: Inspect Chrome Window
+```bash
+inspect_chrome_window() {
+    osascript <<'APPLESCRIPT'
+tell application "Google Chrome"
+    if (count of windows) = 0 then return "error:No Chrome windows open"
+    
+    set windowCount to count of windows
+    set win to front window
+    set tabCount to count of tabs of win
+    set activeIdx to active tab index of win
+    
+    return "ok:" & windowCount & ":" & tabCount & ":" & activeIdx
+end tell
+APPLESCRIPT
+}
+```
 
 ## Find and Activate Tab by URL Pattern
 

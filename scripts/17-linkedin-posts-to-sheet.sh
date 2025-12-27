@@ -3,7 +3,11 @@ set -euo pipefail
 
 # LinkedIn Posts to Google Sheet Automation
 #
+# CRITICAL: This script starts by inspecting opened Chrome window tabs.
+# No new Chrome windows are opened - works with existing tabs only.
+#
 # This script uses CLIPBOARD-BASED EXTRACTION (proven method):
+# 0. Inspect opened Chrome window and detect required tabs dynamically
 # 1. Navigate to LinkedIn activity page
 # 2. Use Cmd+A, Cmd+C to capture all visible content to clipboard
 # 3. Parse clipboard with Python to extract posts, times, hashtags
@@ -16,21 +20,125 @@ set -euo pipefail
 #   ./17-linkedin-posts-to-sheet.sh START_DATE END_DATE
 #   ./17-linkedin-posts-to-sheet.sh 2025-12-22 2025-12-26
 #
+# Tab Override (optional - tabs are auto-detected by default):
+#   LINKEDIN_ACTIVITY_TAB=12 GOOGLE_SHEET_TAB=33 ./17-linkedin-posts-to-sheet.sh 2025-12-27 2025-12-27
+#
 # Prerequisites:
-# - Chrome with LinkedIn activity page and Google Sheet tabs open
+# - Chrome with LinkedIn activity page and Google Sheet tabs already open
 # - LinkedIn activity page: linkedin.com/in/YOUR_USER/recent-activity/all/
+# - NO new Chrome windows will be opened
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-# Configuration
-LINKEDIN_ACTIVITY_TAB="${LINKEDIN_ACTIVITY_TAB:-7}"
-GOOGLE_SHEET_TAB="${GOOGLE_SHEET_TAB:-11}"
+# Configuration - tabs auto-detected if not set
+LINKEDIN_ACTIVITY_TAB="${LINKEDIN_ACTIVITY_TAB:-}"
+GOOGLE_SHEET_TAB="${GOOGLE_SHEET_TAB:-}"
 SHEET_START_DATE="2025-12-08"  # Row 237
 SHEET_START_ROW=237
 ROWS_PER_DATE=2  # Each date takes 2 rows in the sheet
 
 log() { printf "[%s] %s\n" "$(date +%H:%M:%S)" "$*"; }
 log_error() { printf "[%s] ERROR: %s\n" "$(date +%H:%M:%S)" "$*" >&2; }
+
+# ============================================================
+# STEP 0: Chrome Window/Tab Inspection (MANDATORY FIRST STEP)
+# ============================================================
+
+# Verify Chrome has window open and get tab counts
+inspect_chrome_window() {
+    osascript <<'APPLESCRIPT'
+tell application "Google Chrome"
+    if (count of windows) = 0 then return "error:No Chrome windows open"
+    
+    set windowCount to count of windows
+    set win to front window
+    set tabCount to count of tabs of win
+    set activeIdx to active tab index of win
+    
+    return "ok:" & windowCount & ":" & tabCount & ":" & activeIdx
+end tell
+APPLESCRIPT
+}
+
+# Detect required tabs dynamically by URL/title patterns
+detect_required_tabs() {
+    osascript <<'APPLESCRIPT'
+tell application "Google Chrome"
+    if (count of windows) = 0 then return "error:No Chrome windows open"
+    
+    set win to front window
+    set activityTab to 0
+    set sheetTab to 0
+    
+    repeat with i from 1 to count of tabs of win
+        set t to tab i of win
+        set tabURL to URL of t
+        set tabTitle to title of t
+        
+        -- Find LinkedIn Activity tab (mahmoudrabie2004/recent-activity)
+        if tabURL contains "mahmoudrabie2004/recent-activity" then
+            set activityTab to i
+        end if
+        
+        -- Find Google Sheet tab by title pattern
+        if tabURL contains "docs.google.com/spreadsheets" then
+            if tabTitle contains "Selected Sources" or tabTitle contains "Weekly posts" then
+                set sheetTab to i
+            end if
+        end if
+    end repeat
+    
+    if activityTab = 0 then return "error:LinkedIn Activity tab not found"
+    if sheetTab = 0 then return "error:Google Sheet tab not found"
+    
+    return (activityTab as string) & ":" & (sheetTab as string)
+end tell
+APPLESCRIPT
+}
+
+# Initialize tabs - auto-detect if not provided via environment
+init_tabs() {
+    log "Step 0: Inspecting opened Chrome window..."
+    
+    # First verify Chrome window exists
+    local window_info
+    window_info=$(inspect_chrome_window)
+    
+    if [[ "$window_info" == error:* ]]; then
+        log_error "${window_info#error:}"
+        exit 1
+    fi
+    
+    # Parse window info: ok:windowCount:tabCount:activeIdx
+    IFS=':' read -r status windowCount tabCount activeIdx <<< "$window_info"
+    log "  Chrome windows: $windowCount, Front window tabs: $tabCount, Active: Tab $activeIdx"
+    
+    # If tabs not provided, auto-detect
+    if [[ -z "$LINKEDIN_ACTIVITY_TAB" || -z "$GOOGLE_SHEET_TAB" ]]; then
+        log "  Auto-detecting required tabs..."
+        local tab_info
+        tab_info=$(detect_required_tabs)
+        
+        if [[ "$tab_info" == error:* ]]; then
+            log_error "${tab_info#error:}"
+            log_error "Please ensure LinkedIn Activity and Google Sheet tabs are open"
+            exit 1
+        fi
+        
+        # Parse tab info: activityTab:sheetTab
+        IFS=':' read -r detected_activity detected_sheet <<< "$tab_info"
+        
+        # Use detected values if not overridden
+        LINKEDIN_ACTIVITY_TAB="${LINKEDIN_ACTIVITY_TAB:-$detected_activity}"
+        GOOGLE_SHEET_TAB="${GOOGLE_SHEET_TAB:-$detected_sheet}"
+    fi
+    
+    log "  LinkedIn Activity Tab: $LINKEDIN_ACTIVITY_TAB"
+    log "  Google Sheet Tab: $GOOGLE_SHEET_TAB"
+    log ""
+}
+
+# ============================================================
 
 # Validate date format
 validate_date() {
@@ -256,6 +364,9 @@ main() {
     log "Date range: $start_date to $end_date"
     log "Today: $today"
     log ""
+    
+    # Step 0: Inspect Chrome window and detect tabs (MANDATORY FIRST STEP)
+    init_tabs
     
     # Step 1: Navigate to LinkedIn activity tab
     log "Step 1: Navigate to LinkedIn activity tab ($LINKEDIN_ACTIVITY_TAB)"
