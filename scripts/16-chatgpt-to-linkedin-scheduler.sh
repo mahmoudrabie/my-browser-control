@@ -45,13 +45,13 @@ declare -A GPT_IDS=(
     ["OpenSourceLLMs"]="68a26a3f484c8191b33389a508d57685"
 )
 
-# Schedule times (1 hour apart starting at 11:00 AM)
+# Schedule times (1 hour apart starting at 1:00 PM)
 declare -A SCHEDULE_TIMES=(
-    ["SOTA"]="11:00 AM"
-    ["AgenticAI"]="12:00 PM"
-    ["Cybersecurity"]="1:00 PM"
-    ["OpenSourceAIProjects"]="2:00 PM"
-    ["OpenSourceLLMs"]="3:00 PM"
+    ["SOTA"]="1:00 PM"
+    ["AgenticAI"]="2:00 PM"
+    ["Cybersecurity"]="3:00 PM"
+    ["OpenSourceAIProjects"]="4:00 PM"
+    ["OpenSourceLLMs"]="5:00 PM"
 )
 
 # Google Sheet columns
@@ -567,8 +567,8 @@ EOF
 
 # Main execution
 main() {
-    local today_date=$(date "+%B %-d, %Y")  # e.g., "December 26, 2025"
-    local sheet_row=273  # Row for 2025-12-26
+    local today_date="December 28, 2025"  # Tomorrow's date
+    local sheet_row=275  # Row for 2025-12-28 (273 + 2)
 
     echo "==========================================="
     echo "LinkedIn Post Scheduler"
@@ -576,11 +576,11 @@ main() {
     echo "Schedule date: $today_date"
     echo ""
     echo "Schedule times:"
-    echo "  SOTA: 11:00 AM"
-    echo "  AgenticAI: 12:00 PM"
-    echo "  Cybersecurity: 1:00 PM"
-    echo "  OpenSourceAIProjects: 2:00 PM"
-    echo "  OpenSourceLLMs: 3:00 PM"
+    echo "  SOTA: 1:00 PM"
+    echo "  AgenticAI: 2:00 PM"
+    echo "  Cybersecurity: 3:00 PM"
+    echo "  OpenSourceAIProjects: 4:00 PM"
+    echo "  OpenSourceLLMs: 5:00 PM"
     echo ""
 
     declare -a titles

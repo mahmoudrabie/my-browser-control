@@ -516,6 +516,9 @@ end tell
 
 ### ✅ Pattern 5: Input Field Setting (Focus + Select + Delete + Keystroke)
 For date/time inputs, use focus + select + delete + keystroke (calendar pickers don't work):
+
+**CRITICAL: Date format must be MM/DD/YYYY (e.g., 12/28/2025), NOT "December 28, 2025"**
+
 ```applescript
 -- Focus and select input via JavaScript
 tell application "Google Chrome"
@@ -535,7 +538,7 @@ tell application "System Events"
     tell process "Google Chrome"
         key code 51  -- Backspace to delete selected text
         delay 0.2
-        keystroke "12/27/2025"  -- Format: MM/DD/YYYY
+        keystroke "12/28/2025"  -- Format: MM/DD/YYYY (REQUIRED)
     end tell
 end tell
 ```
@@ -549,6 +552,57 @@ execute javascript "
         textareas[1].value;
     } else { ''; }
 "
+```
+
+### ✅ Pattern 7: Reliable Page Refresh (JavaScript location.reload)
+**CRITICAL**: `Cmd+R` can fail silently. Use JavaScript `location.reload()` and VERIFY textarea is empty:
+```bash
+# Refresh using JavaScript (more reliable than Cmd+R)
+osascript <<'EOF'
+tell application "Google Chrome"
+    activate
+    tell active tab of front window
+        execute javascript "location.reload()"
+    end tell
+end tell
+EOF
+sleep 3
+
+# MUST VALIDATE: Textarea should be 0 chars after refresh
+textarea_len=$(osascript <<'EOF'
+tell application "Google Chrome"
+    tell active tab of front window
+        execute javascript "document.querySelector('textarea').value.length"
+    end tell
+end tell
+EOF
+)
+[ "$textarea_len" -eq 0 ] && echo "✅ Refresh validated" || echo "❌ Refresh failed, retry"
+```
+
+### ✅ Pattern 8: Character Count Check (LinkedIn 3000 char limit)
+**Before pasting to LinkedIn, verify cleaned text is under 3000 chars:**
+```bash
+char_count=$(pbpaste | wc -c | tr -d ' ')
+if [ "$char_count" -gt 3000 ]; then
+    echo "❌ Content exceeds 3000 chars ($char_count). Go back to ChatGPT and request shorter version."
+    # Navigate back to ChatGPT and ask:
+    # "Please reduce the post to be less than 3000 characters while keeping the same format style and titles"
+else
+    echo "✅ Content is $char_count chars (under 3000 limit)"
+fi
+```
+
+### ✅ Pattern 9: LinkedIn Feed Refresh Before New Post
+**Always refresh LinkedIn feed before clicking "Start a post" to ensure clean state:**
+```applescript
+tell application "Google Chrome"
+    activate
+    tell active tab of front window
+        execute javascript "location.reload()"
+    end tell
+end tell
+delay 3
 ```
 
 ## Google Sheet Update
